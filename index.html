@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Планёрка — бронирование времени</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg:#181C22;
+    --panel:#20262E;
+    --panel-2:#262D36;
+    --line:#333B46;
+    --amber:#E8A33D;
+    --amber-dim:#8A6428;
+    --text:#EDEFF2;
+    --text-dim:#8C97A6;
+    --busy:#3A3F4A;
+    --busy-line:#565F6D;
+    --ok:#4CAF7D;
+    --err:#D9695F;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .app{
+    display:grid;
+    grid-template-columns:240px 1fr;
+    align-items:start;
+    min-height:100vh;
+  }
+  @media(max-width:760px){
+    .app{grid-template-columns:1fr;}
+    .sidebar{
+      display:flex;
+      flex-direction:row;
+      align-items:center;
+      overflow-x:auto;
+      gap:8px;
+      padding:14px;
+    }
+    .sidebar .brand{display:none;}
+    .cal-list{display:flex;flex-direction:row;gap:8px;}
+  }
+
+  /* Sidebar */
+  .sidebar{
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    padding:28px 20px;
+    display:flex;
+    flex-direction:column;
+    gap:28px;
+  }
+  .brand{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:19px;
+    letter-spacing:-0.01em;
+  }
+  .brand span{color:var(--amber);}
+  .brand .sub{
+    display:block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--text-dim);
+    font-weight:400;
+    margin-top:4px;
+    letter-spacing:0.02em;
+  }
+  .section-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    margin-bottom:10px;
+  }
+  .cal-list{display:flex;flex-direction:column;gap:6px;}
+  .cal-btn{
+    text-align:left;
+    background:transparent;
+    border:1px solid transparent;
+    color:var(--text-dim);
+    padding:10px 12px;
+    border-radius:var(--radius);
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    transition:background .15s,color .15s,border-color .15s;
+    white-space:nowrap;
+  }
+  .cal-btn .dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim);flex-shrink:0;}
+  .cal-btn:hover{background:var(--panel-2);color:var(--text);}
+  .cal-btn.active{
+    background:rgba(232,163,61,0.12);
+    border-color:rgba(232,163,61,0.35);
+    color:var(--amber);
+  }
+  .cal-btn.active .dot{background:var(--amber);}
+
+  .auth-box{margin-top:auto;}
+  .auth-btn{
+    width:100%;
+    padding:11px 14px;
+    border-radius:var(--radius);
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .auth-btn:hover{border-color:var(--amber-dim);}
+  .auth-status{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ok);
+    margin-top:8px;
+    display:none;
+  }
+  .auth-status.on{display:block;}
+
+  /* Main */
+  .main{padding:32px 48px;max-width:1500px;}
+  @media(max-width:760px){.main{padding:20px;}}
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:24px;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .date-nav{display:flex;align-items:center;gap:14px;}
+  .nav-btn{
+    width:34px;height:34px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--text);
+    cursor:pointer;
+    font-size:15px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .nav-btn:hover{border-color:var(--amber-dim);}
+  .date-label{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:20px;
+    font-weight:600;
+    min-width:210px;
+  }
+  .date-label .dow{color:var(--amber);font-weight:500;}
+  .today-btn{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    color:var(--text-dim);
+    background:transparent;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:7px 12px;
+    cursor:pointer;
+  }
+  .today-btn:hover{color:var(--text);border-color:var(--amber-dim);}
+
+  .hint{
+    font-size:12.5px;
+    color:var(--text-dim);
+    margin-bottom:18px;
+  }
+
+  /* Grid */
+  .grid-wrap{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:64px 1fr;
+  }
+  .row{
+    display:contents;
+  }
+  .time-cell{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--text-dim);
+    padding:0 12px;
+    text-align:right;
+    border-top:1px solid var(--line);
+    display:flex;
+    align-items:flex-start;
+    padding-top:6px;
+    height:56px;
+  }
+  .row:first-child .time-cell{border-top:none;}
+  .slot-cell{
+    border-top:1px solid var(--line);
+    border-left:1px solid var(--line);
+    height:56px;
+    position:relative;
+    cursor:pointer;
+    transition:background .12s;
+  }
+  .row:first-child .slot-cell{border-top:none;}
+  .slot-cell:hover{background:rgba(232,163,61,0.07);}
+  .slot-cell.half::after{
+    content:'';
+    position:absolute;
+    left:0;right:0;top:0;
+    border-top:1px dashed var(--line);
+  }
+  .event-block{
+    position:absolute;
+    left:6px;right:6px;
+    background:var(--busy);
+    border-left:3px solid var(--busy-line);
+    border-radius:6px;
+    padding:5px 8px;
+    font-size:12px;
+    color:var(--text);
+    overflow:hidden;
+    z-index:2;
+    cursor:default;
+  }
+  .event-block .t{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-dim);}
+  .event-block.mine{
+    background:rgba(76,175,125,0.18);
+    border-left-color:var(--ok);
+  }
+
+  .loading-msg, .signin-msg{
+    padding:40px 20px;
+    text-align:center;
+    color:var(--text-dim);
+    font-size:13.5px;
+  }
+
+  /* Modal */
+  .overlay{
+    position:fixed;inset:0;
+    background:rgba(10,12,15,0.6);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:26px;
+    width:100%;max-width:420px;
+  }
+  .modal h3{
+    font-family:'Space Grotesk',sans-serif;
+    margin:0 0 4px;
+    font-size:18px;
+  }
+  .modal .modal-sub{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    color:var(--amber);
+    margin-bottom:18px;
+  }
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  .field input, .field textarea, .field select{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 11px;
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+  }
+  .field textarea{resize:vertical;min-height:60px;}
+  .field input:focus, .field textarea:focus, .field select:focus{
+    outline:none;border-color:var(--amber-dim);
+  }
+  .row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .modal-actions{display:flex;gap:10px;margin-top:20px;}
+  .btn{
+    flex:1;
+    padding:11px;
+    border-radius:8px;
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    font-weight:500;
+    cursor:pointer;
+    border:1px solid var(--line);
+  }
+  .btn-cancel{background:transparent;color:var(--text-dim);}
+  .btn-cancel:hover{color:var(--text);}
+  .btn-save{background:var(--amber);color:#20180A;border-color:var(--amber);}
+  .btn-save:hover{filter:brightness(1.06);}
+  .btn-save:disabled{opacity:0.5;cursor:not-allowed;}
+  .warn{
+    font-size:12px;
+    color:var(--err);
+    margin-top:10px;
+    display:none;
+  }
+  .warn.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">Планёрка<span class="sub">рабочие часы 09:00–18:00</span></div>
+
+    <div>
+      <div class="section-label">Календари</div>
+      <div class="cal-list" id="calList"></div>
+    </div>
+
+    <div class="auth-box">
+      <button class="auth-btn" id="authBtn">Войти через Google</button>
+      <div class="auth-status" id="authStatus">● подключено</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="date-nav">
+        <button class="nav-btn" id="prevBtn">‹</button>
+        <div class="date-label" id="dateLabel"></div>
+        <button class="nav-btn" id="nextBtn">›</button>
+      </div>
+      <button class="today-btn" id="todayBtn">Сегодня</button>
+    </div>
+    <div class="hint">Кликните по свободному времени в сетке, чтобы назначить встречу. Занятые слоты отмечены серым.</div>
+
+    <div class="grid-wrap" id="gridWrap">
+      <div class="signin-msg">Войдите через Google слева, чтобы увидеть расписание и назначать встречи.</div>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3>Новая встреча</h3>
+    <div class="modal-sub" id="modalCalLabel"></div>
+    <div class="field">
+      <label>Название встречи</label>
+      <input type="text" id="fTitle" placeholder="Например: «Встреча»">
+    </div>
+    <div class="field">
+      <label>Описание / комментарий</label>
+      <textarea id="fDesc" placeholder="О чём, где встреча, ссылка на компанию"></textarea>
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Начало</label>
+        <input type="time" id="fStart" step="900">
+      </div>
+      <div class="field">
+        <label>Конец</label>
+        <input type="time" id="fEnd" step="900">
+      </div>
+    </div>
+    <div class="warn" id="overlapWarn">⚠ Пересекается с уже занятым временем. Проверьте расписание.</div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="cancelBtn">Отмена</button>
+      <button class="btn btn-save" id="saveBtn">Забронировать</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========================================================================
+   НАСТРОЙКА — заполните перед публикацией
+   ======================================================================== */
+const CONFIG = {
+  // Client ID из Google Cloud Console (OAuth 2.0, тип "Веб-приложение")
+  CLIENT_ID: '341574727521-cps6ju8745n0u86glibtu5pq741mslph.apps.googleusercontent.com',
+
+  // Список календарей для переключения слева.
+  // id — email календаря (тот, что вы шарили через "Доступ для отдельных пользователей"),
+  // или 'primary' для календаря того, кто сейчас залогинен.
+  CALENDARS: [
+    { id: 'primary', label: 'Мой календарь' },
+    // { id: 'kollega@company.com', label: 'Календарь Ибрагима' },
+  ],
+
+  WORK_START_HOUR: 9,
+  WORK_END_HOUR: 18,
+  SLOT_MINUTES: 30,
+  SCOPES: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.events.readonly'
+};
+/* ======================================================================== */
+
+let accessToken = null;
+let tokenClient = null;
+let activeCalendar = CONFIG.CALENDARS[0];
+let viewDate = new Date();
+let pendingSlot = null;
+let currentEvents = [];
+
+const $ = (id) => document.getElementById(id);
+
+function fmtDateLabel(d){
+  const dow = d.toLocaleDateString('ru-RU', { weekday: 'long' });
+  const rest = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  return `<span class="dow">${dow[0].toUpperCase()+dow.slice(1)}</span>, ${rest}`;
+}
+
+function renderCalList(){
+  const wrap = $('calList');
+  wrap.innerHTML = '';
+  CONFIG.CALENDARS.forEach(cal => {
+    const b = document.createElement('button');
+    b.className = 'cal-btn' + (cal.id === activeCalendar.id ? ' active' : '');
+    b.innerHTML = `<span class="dot"></span>${cal.label}`;
+    b.onclick = () => { activeCalendar = cal; renderCalList(); loadDay(); };
+    wrap.appendChild(b);
+  });
+}
+
+/* ---- Google Identity Services auth ---- */
+const AUTH_KEY = 'planerka_auth';
+
+function saveToken(token, expiresInSec){
+  const expiresAt = Date.now() + (expiresInSec * 1000) - 60000; // запас 60 сек
+  localStorage.setItem(AUTH_KEY, JSON.stringify({ token, expiresAt }));
+}
+function loadSavedToken(){
+  try{
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data.token || Date.now() >= data.expiresAt) return null;
+    return data.token;
+  }catch(e){ return null; }
+}
+function clearSavedToken(){ localStorage.removeItem(AUTH_KEY); }
+
+function markSignedIn(){
+  $('authStatus').classList.add('on');
+  $('authBtn').textContent = 'Сменить аккаунт';
+}
+
+function initAuth(){
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.CLIENT_ID,
+    scope: CONFIG.SCOPES,
+    callback: (resp) => {
+      if (resp.error) {
+        clearSavedToken();
+        return;
+      }
+      accessToken = resp.access_token;
+      saveToken(resp.access_token, resp.expires_in || 3500);
+      markSignedIn();
+      loadDay();
+    }
+  });
+
+  // Уже есть действующий токен из прошлого визита — используем сразу, без обращения к Google
+  const saved = loadSavedToken();
+  if (saved){
+    accessToken = saved;
+    markSignedIn();
+    loadDay();
+  }
+}
+$('authBtn').addEventListener('click', () => {
+  if (!tokenClient) { alert('Не настроен CLIENT_ID — см. инструкцию под кодом.'); return; }
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+});
+
+/* ---- Calendar API ---- */
+function silentRefresh(){
+  return new Promise((resolve) => {
+    if (!tokenClient) return resolve(false);
+    google.accounts.oauth2.initTokenClient({
+      client_id: CONFIG.CLIENT_ID,
+      scope: CONFIG.SCOPES,
+      callback: (resp) => {
+        if (resp.error) { clearSavedToken(); resolve(false); return; }
+        accessToken = resp.access_token;
+        saveToken(resp.access_token, resp.expires_in || 3500);
+        resolve(true);
+      }
+    }).requestAccessToken({ prompt: '' });
+  });
+}
+
+async function apiFetch(url, options){
+  let res = await fetch(url, options(accessToken));
+  if (res.status === 401){
+    const refreshed = await silentRefresh();
+    if (refreshed) res = await fetch(url, options(accessToken));
+  }
+  return res;
+}
+
+async function fetchEvents(calId, dayStart, dayEnd){
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
+    + `?timeMin=${dayStart.toISOString()}&timeMax=${dayEnd.toISOString()}`
+    + `&singleEvents=true&orderBy=startTime`;
+  const res = await apiFetch(url, (token) => ({ headers: { Authorization: `Bearer ${token}` } }));
+  if (!res.ok) throw new Error('Не удалось загрузить события (' + res.status + ')');
+  const data = await res.json();
+  return data.items || [];
+}
+
+async function createEvent(calId, {summary, description, start, end}){
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`;
+  const res = await apiFetch(url, (token) => ({
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      summary, description,
+      start: { dateTime: start.toISOString() },
+      end: { dateTime: end.toISOString() }
+    })
+  }));
+  if (!res.ok){
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err.error?.message || 'Не удалось создать событие (' + res.status + ')');
+  }
+  return res.json();
+}
+
+/* ---- Grid rendering ---- */
+function buildGridSkeleton(){
+  const startH = CONFIG.WORK_START_HOUR, endH = CONFIG.WORK_END_HOUR;
+  const rows = (endH - startH) * (60 / CONFIG.SLOT_MINUTES);
+  let html = '<div class="grid" id="gridInner">';
+  for(let i=0;i<rows;i++){
+    const hour = startH + Math.floor(i * CONFIG.SLOT_MINUTES / 60);
+    const minute = (i * CONFIG.SLOT_MINUTES) % 60;
+    const isHalf = minute !== 0;
+    const label = minute === 0 ? `${String(hour).padStart(2,'0')}:00` : '';
+    html += `<div class="row">
+      <div class="time-cell">${label}</div>
+      <div class="slot-cell${isHalf?' half':''}" data-hour="${hour}" data-min="${minute}"></div>
+    </div>`;
+  }
+  html += '</div>';
+  $('gridWrap').innerHTML = html;
+
+  document.querySelectorAll('.slot-cell').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const hour = parseInt(cell.dataset.hour);
+      const minute = parseInt(cell.dataset.min);
+      openModal(hour, minute);
+    });
+  });
+}
+
+function renderEvents(events){
+  const startH = CONFIG.WORK_START_HOUR;
+  const slotH = 56; // px, matches CSS .slot-cell height
+  const slotMin = CONFIG.SLOT_MINUTES;
+
+  events.forEach(ev => {
+    if (!ev.start?.dateTime || !ev.end?.dateTime) return; // skip all-day
+    const s = new Date(ev.start.dateTime);
+    const e = new Date(ev.end.dateTime);
+    const startMinFromGrid = (s.getHours() - startH) * 60 + s.getMinutes();
+    const durMin = (e - s) / 60000;
+    if (startMinFromGrid < 0) return;
+
+    const top = (startMinFromGrid / slotMin) * slotH;
+    const height = Math.max((durMin / slotMin) * slotH - 2, 20);
+
+    const gridInner = $('gridInner');
+    gridInner.style.position = 'relative';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'event-block';
+    overlay.style.position = 'absolute';
+    overlay.style.left = '64px';
+    overlay.style.right = '0';
+    overlay.style.top = top + 'px';
+    overlay.style.height = height + 'px';
+    overlay.innerHTML = `<div class="t">${s.toTimeString().slice(0,5)}–${e.toTimeString().slice(0,5)}</div>${ev.summary || '(без названия)'}`;
+    gridInner.appendChild(overlay);
+  });
+}
+
+async function loadDay(){
+  if (!accessToken) return;
+  $('dateLabel').innerHTML = fmtDateLabel(viewDate);
+  buildGridSkeleton();
+  $('gridWrap').insertAdjacentHTML('beforeend', '<div class="loading-msg" id="loadingMsg">Загружаю расписание…</div>');
+
+  const dayStart = new Date(viewDate); dayStart.setHours(0,0,0,0);
+  const dayEnd = new Date(viewDate); dayEnd.setHours(23,59,59,999);
+
+  try{
+    currentEvents = await fetchEvents(activeCalendar.id, dayStart, dayEnd);
+    $('loadingMsg')?.remove();
+    renderEvents(currentEvents);
+  }catch(e){
+    $('loadingMsg')?.remove();
+    $('gridWrap').insertAdjacentHTML('beforeend', `<div class="loading-msg">Ошибка: ${e.message}</div>`);
+  }
+}
+
+/* ---- Modal / booking ---- */
+function openModal(hour, minute){
+  pendingSlot = { hour, minute };
+  $('modalCalLabel').textContent = activeCalendar.label;
+  $('fTitle').value = '';
+  $('fDesc').value = '';
+  $('fStart').value = `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+  const endH = Math.min(hour + 1, CONFIG.WORK_END_HOUR);
+  $('fEnd').value = `${String(endH).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+  $('overlapWarn').classList.remove('show');
+  $('overlay').classList.add('show');
+  $('fTitle').focus();
+}
+function closeModal(){ $('overlay').classList.remove('show'); pendingSlot = null; }
+$('cancelBtn').addEventListener('click', closeModal);
+$('overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay') closeModal(); });
+
+function computeRange(){
+  const [sh,sm] = $('fStart').value.split(':').map(Number);
+  const [eh,em] = $('fEnd').value.split(':').map(Number);
+  const start = new Date(viewDate);
+  start.setHours(sh, sm, 0, 0);
+  const end = new Date(viewDate);
+  end.setHours(eh, em, 0, 0);
+  return { start, end };
+}
+function overlapsExisting(start, end){
+  return currentEvents.some(ev => {
+    if (!ev.start?.dateTime) return false;
+    const s = new Date(ev.start.dateTime), e = new Date(ev.end.dateTime);
+    return start < e && end > s;
+  });
+}
+['input','change'].forEach(evt => {
+  $('fStart').addEventListener(evt, checkOverlap);
+  $('fEnd').addEventListener(evt, checkOverlap);
+});
+function checkOverlap(){
+  const { start, end } = computeRange();
+  $('overlapWarn').classList.toggle('show', end > start && overlapsExisting(start, end));
+}
+
+$('saveBtn').addEventListener('click', async () => {
+  const title = $('fTitle').value.trim();
+  if (!title){ $('fTitle').focus(); return; }
+  const { start, end } = computeRange();
+  if (end <= start){ alert('Время окончания должно быть позже времени начала.'); return; }
+
+  $('saveBtn').disabled = true;
+  $('saveBtn').textContent = 'Сохраняю…';
+  try{
+    await createEvent(activeCalendar.id, {
+      summary: title,
+      description: $('fDesc').value.trim(),
+      start, end
+    });
+    closeModal();
+    await loadDay();
+  }catch(e){
+    alert('Не получилось создать событие: ' + e.message);
+  }finally{
+    $('saveBtn').disabled = false;
+    $('saveBtn').textContent = 'Забронировать';
+  }
+});
+
+/* ---- Date nav ---- */
+$('prevBtn').addEventListener('click', () => { viewDate.setDate(viewDate.getDate()-1); loadDay(); });
+$('nextBtn').addEventListener('click', () => { viewDate.setDate(viewDate.getDate()+1); loadDay(); });
+$('todayBtn').addEventListener('click', () => { viewDate = new Date(); loadDay(); });
+
+/* ---- Init ---- */
+renderCalList();
+$('dateLabel').innerHTML = fmtDateLabel(viewDate);
+window.addEventListener('load', () => {
+  // GIS script loads async; poll briefly until available
+  const t = setInterval(() => {
+    if (window.google?.accounts?.oauth2){ clearInterval(t); initAuth(); }
+  }, 150);
+});
+</script>
+</body>
+</html>
